@@ -1,0 +1,43 @@
+
+  xq input [connect] [-js]
+
+    WHERE:
+      input = either a file name or dash (-) for standard input
+      connect (optional) = either
+         * a literal connection string starting with xcc:// or
+           xccs://
+         * the suffix of a property name in xq.properties
+
+    FUNCTION:
+
+      Execute input according to uri found either as "connect" on the
+      command line, or in xq.properties.
+
+      If "input" doesn't exist, .xq or .xqy suffix will be tried
+      for XQuery, or .js for JavaScript.
+
+      if xq.properties in the execution directory looks like this:
+
+        uri = xcc://user:pass@host:port
+        uri.qa = xccs://qa-user:qa-pass@qa-host:qa-port
+
+      then
+        xq count
+      will execute count (or count.xqy) using the first URI, whereas
+        xq count qa
+      will use the second.
+
+      A connection string given on the command line takes precedence.
+
+        echo 'count(/)' xq -
+
+      will run from standard input
+
+      -js anywhere in the argument list will cause execution
+      to be in JavaScript rather than XQuery, for example:
+
+        echo 'fn.count(fn.doc())' | xq - -js
+
+
+
+
