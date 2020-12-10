@@ -52,7 +52,7 @@ $ xq
 
       A connection string given on the command line takes precedence.
 
-        echo 'count(/)' xq -
+        echo 'count(/)' | xq -
 
       will run from standard input
 
