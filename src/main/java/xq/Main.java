@@ -256,11 +256,15 @@ public class Main {
 
 
     public static void main(String[] args) {
+        Main m=new Main();
         try {
-            new Main().run(args);
+            m.run(args);
             System.exit(0);
         }
         catch (Exception ex) {
+            out.println("\n---------------------\n" +
+                "CAUGHT EXCEPTION running query against "+m.uriStr);
+
             out.println(ex);
             System.exit(-1);
         }

@@ -29,8 +29,8 @@ dependencies {
 
     // Use JUnit test framework
     testImplementation 'junit:junit:4.12'
-    runtime fileTree(dir: 'lib', include: '*.jar')
-    compile fileTree(dir: 'lib', include: '*.jar')
+    runtimeOnly fileTree(dir: 'lib', include: '*.jar')
+    implementation fileTree(dir: 'lib', include: '*.jar')
 
     extraLibs fileTree(dir: 'lib', include: '*.jar')
 }
@@ -43,7 +43,7 @@ task uberJar(type: Jar) {
              'Main-class': 'xq.Main'
         )
     }
-    baseName = project.name + '-all'
+    archiveBaseName = project.name + '-all'
     from { configurations.extraLibs.collect {
         it.isDirectory() ? it : zipTree(it) } }
     with jar
