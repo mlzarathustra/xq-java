@@ -158,7 +158,7 @@ public class Main {
         }
 
         if (uriStr == null) {
-            String propNameSuffix = "";
+            String propNameSuffix = nonOptArgs.size() == 0 ? "" : nonOptArgs.get(0);
             String noXCC = "Connection string starting with xcc:// or xccs:// "+
                 "not found in argument list, \n";
 
