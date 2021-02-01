@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Windows GIT can't figure out how to pick up
+# cygwin permissions. So we have to tell it 
+# if something is executable. 
+
+git update-index --chmod=+x xq
+
+exit
+
+##  This behavior doesn't seem correct! 
+
+shiva@menhir /cygdrive/f/shiva/Development/xq-java
+$ git diff
+
+shiva@menhir /cygdrive/f/shiva/Development/xq-java
+$ git update-index --chmod=+x xq
+
+shiva@menhir /cygdrive/f/shiva/Development/xq-java
+$ git diff
+diff --git a/xq b/xq
+old mode 100755
+new mode 100644
+
+shiva@menhir /cygdrive/f/shiva/Development/xq-java
+$ git update-index --chmod=-x xq
+
+shiva@menhir /cygdrive/f/shiva/Development/xq-java
+$ git diff
+
+shiva@menhir /cygdrive/f/shiva/Development/xq-java
+
