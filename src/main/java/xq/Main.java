@@ -254,6 +254,10 @@ public class Main {
         runQuery(query);
     }
 
+    public static String stripPassword(String uri) {
+        return uri.replaceFirst(":[^/]*@",":*****@");
+    }
+
 
     public static void main(String[] args) {
         Main m=new Main();
@@ -263,7 +267,7 @@ public class Main {
         }
         catch (Exception ex) {
             out.println("\n---------------------\n" +
-                "CAUGHT EXCEPTION running query against "+m.uriStr);
+                "CAUGHT EXCEPTION running query against "+stripPassword(m.uriStr));
 
             out.println(ex);
             System.exit(-1);
