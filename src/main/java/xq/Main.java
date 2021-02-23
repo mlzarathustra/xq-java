@@ -213,7 +213,7 @@ public class Main {
         // // //  the main action // // //
 
     void runQuery(String query) throws Exception {
-        URI uri=new URI( uriStr );
+        URI uri=new URI( uriStr.trim() );
         ContentSource cs;
         //  #SSL
         if (uriStr.startsWith("xccs://")) {
@@ -255,6 +255,7 @@ public class Main {
     }
 
     public static String stripPassword(String uri) {
+        if (uri == null) return "";
         return uri.replaceFirst(":[^/]*@",":*****@");
     }
 
@@ -274,3 +275,6 @@ public class Main {
         }
     }
 }
+
+
+
