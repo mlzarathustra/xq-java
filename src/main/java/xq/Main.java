@@ -6,6 +6,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.nio.charset.Charset;
 
 import static java.lang.System.out;
 import static java.lang.System.err;
@@ -29,10 +30,11 @@ public class Main {
 
     String uriStr, fileName;
     boolean useJavaScript;
+    boolean cacheResult = true; // ML default 
     ResourceBundle bundle = null;
 
     boolean verbose = true;
-    boolean raw=false; // could add an option to skip utf-8
+    String charSet = "utf-8";
 
     public void usage() {
         try {
@@ -137,7 +139,8 @@ public class Main {
 
         //  Assign: useJavaScript, uriStr, fileName
 
-        if (optArgs.contains("-js")) useJavaScript=true;
+        if (optArgs.contains("-js")) useJavaScript = true;
+        if (optArgs.contains("-stream")) cacheResult = false;
 
         if (optArgs.contains("-")) fileName="-";
         else {
@@ -226,20 +229,24 @@ public class Main {
 
         Request req = session.newAdhocQuery(query);
 
-        if (useJavaScript) {
-            RequestOptions options = new RequestOptions();
-            options.setQueryLanguage("javascript");
-            req.setOptions(options);
-        }
+        RequestOptions options = new RequestOptions();
+        if (useJavaScript) options.setQueryLanguage("javascript");
+        options.setCacheResult(cacheResult);
+        req.setOptions(options);
 
         ResultSequence rs = session.submitRequest( req );
 
-        if (raw) out.println(rs.asString());
-        else {
-            Writer outUtf8=new OutputStreamWriter(System.out,"utf-8");
-
-            outUtf8.write(rs.asString());
-            outUtf8.flush();
+        Writer outWriter=new OutputStreamWriter(System.out,Charset.forName(charSet));
+        if (cacheResult) { //  the whole thing as one string 
+            outWriter.write(rs.asString());
+            outWriter.flush();
+        }
+        else {   //  stream 
+            while (rs.hasNext()) {
+                outWriter.write(rs.next().asString());
+                outWriter.write("\n");
+                outWriter.flush();
+            }
         }
 
         session.close();
@@ -275,6 +282,3 @@ public class Main {
         }
     }
 }
-
-
-
