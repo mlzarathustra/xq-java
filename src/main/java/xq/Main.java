@@ -7,6 +7,7 @@ import java.net.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.nio.charset.Charset;
+import java.util.regex.*;
 
 import static java.lang.System.out;
 import static java.lang.System.err;
@@ -17,6 +18,7 @@ import javax.net.ssl.SSLContext;
 import com.marklogic.xcc.SecurityOptions;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+//import java.security.KeyManagementException;
 import java.security.cert.X509Certificate;
 import java.security.cert.CertificateException;
 //
@@ -211,11 +213,54 @@ public class Main {
         return query;
     }
 
+    class URISpec {
+        String scheme, user, pass, host; 
+        int port;
+    }
+
+
+    URISpec parseUrl(String cs) {
+        Pattern p = Pattern.compile("(xccs?)://([^:]+):(.+)@([^:@]+):(\\d+)");
+        Matcher m = p.matcher(cs);
+
+        if (m.matches()) {
+            URISpec rs = new URISpec();
+            rs.scheme = m.group(1);
+            rs.user = m.group(2);
+            rs.pass = m.group(3);
+            rs.host = m.group(4);
+            rs.port = Integer.parseInt(m.group(5));
+            return rs;
+        }
+        return null;
+    }
+
+    //  can deal with ! in the password, unlike the URI constructor
+    //
+    URI smartURI(String cs) {
+        URI uri = null;
+        try { uri = new URI(cs); }
+        catch (Exception ignore) {} 
+
+        if (uri == null || uri.getHost() == null) {
+            URISpec v = parseUrl(cs);
+            if (v != null) {
+                try {
+                    uri = new URI(
+                        v.scheme, ""+v.user+":"+v.pass, 
+                        v.host, v.port, "","","");
+                }
+                catch (Exception ignore) {} 
+            }
+        }
+        return uri;
+    }    
+
         //
         // // //  the main action // // //
 
     void runQuery(String query) throws Exception {
-        URI uri=new URI( uriStr.trim() );
+        URI uri=smartURI( uriStr.trim() );
         ContentSource cs;
         //  #SSL
         if (uriStr.startsWith("xccs://")) {
