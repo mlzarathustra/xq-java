@@ -17,7 +17,6 @@ import javax.net.ssl.SSLContext;
 import com.marklogic.xcc.SecurityOptions;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-//import java.security.KeyManagementException;
 import java.security.cert.X509Certificate;
 import java.security.cert.CertificateException;
 //
