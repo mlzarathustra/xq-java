@@ -46,8 +46,8 @@ class XccConn {
         return xc
     }
 
-    def parseUrl(cs) {
-        def m=cs =~  /(xccs?):\/\/([^:]+):(.+)@([^:@]+):(\d+)/
+    def parseUri(cs) {
+        def m=cs =~ /(xccs?):\/\/([^:]+):(.+)@([^@:]+):(\d+)/
 
         if (m) {
             def m0=m[0]
@@ -55,19 +55,6 @@ class XccConn {
                 host: m0[4], port: m0[5] ]
         }
         null
-    }
-
-    //  can deal with ! in the password, unlike the URI constructor
-    //
-    URI smartURI(cs) {
-        URI uri = new URI(cs)
-        if (!uri.host) {
-            def v = parseUrl(cs)
-            if (v) uri = new URI(
-                v.scheme, "$v.user:$v.pass", v.host, v.port as int,
-                '','','')
-        }
-        uri
     }
 
     String uriStr, label=''
@@ -79,13 +66,17 @@ class XccConn {
     long elapsed // after calling eachString or firstString, this will be set
 
     XccConn(String u) {
-        uri = smartURI(uriStr=u)
+        def v = parseUri(uriStr=u)
 
         if (uriStr.startsWith("xccs://")) {
-            cs = ContentSourceFactory.newContentSource(uri, newTrustOptions());
+            cs = ContentSourceFactory.newContentSource(
+                v.host, v.port as int, v.user, v.pass, null,
+                newTrustOptions())
         }
         else {
-            cs = ContentSourceFactory.newContentSource(uri);
+            cs = ContentSourceFactory.newContentSource(
+                v.host, v.port as int, v.user, v.pass, null
+            )
         }
 
         session=cs.newSession()

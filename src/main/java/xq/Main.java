@@ -235,39 +235,24 @@ public class Main {
         return null;
     }
 
-    //  can deal with ! in the password, unlike the URI constructor
-    //
-    URI smartURI(String cs) {
-        URI uri = null;
-        try { uri = new URI(cs); }
-        catch (Exception ignore) {} 
-
-        if (uri == null || uri.getHost() == null) {
-            URISpec v = parseUrl(cs);
-            if (v != null) {
-                try {
-                    uri = new URI(
-                        v.scheme, ""+v.user+":"+v.pass, 
-                        v.host, v.port, "","","");
-                }
-                catch (Exception ignore) {} 
-            }
-        }
-        return uri;
-    }    
 
         //
         // // //  the main action // // //
 
     void runQuery(String query) throws Exception {
-        URI uri=smartURI( uriStr.trim() );
+        URISpec v = parseUrl( uriStr.trim() );
         ContentSource cs;
         //  #SSL
         if (uriStr.startsWith("xccs://")) {
-            cs = ContentSourceFactory.newContentSource(uri, newTrustOptions());
+            cs = ContentSourceFactory.newContentSource(
+                v.host, v.port, v.user, v.pass, null, 
+                newTrustOptions()
+            );
         }
         else {
-            cs = ContentSourceFactory.newContentSource(uri);
+            cs = ContentSourceFactory.newContentSource(
+                v.host, v.port, v.user, v.pass, null
+            );
         }
         Session session = cs.newSession();
 
