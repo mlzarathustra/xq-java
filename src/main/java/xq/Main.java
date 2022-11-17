@@ -3,7 +3,6 @@ package xq;
 import com.marklogic.xcc.*;
 
 import java.io.*;
-import java.net.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.nio.charset.Charset;
@@ -32,9 +31,12 @@ public class Main {
     String uriStr, fileName;
     boolean useJavaScript;
     boolean cacheResult = true; // ML default 
-    ResourceBundle bundle = null;
 
+    // from xq.properties
+    ResourceBundle bundle = null;
+    String label=""; // given uri.x, "x" is the label
     boolean verbose = true;
+
     String charSet = "utf-8";
 
     public void usage() {
@@ -121,7 +123,8 @@ public class Main {
         verbose = false;
         try {
             // it doesn't fail until here if the bundle is not found
-            verbose = bundle.containsKey("verbose")? "true".equals(bundle.getString("verbose")) : false;
+            verbose = bundle.containsKey("verbose")? 
+                "true".equals(bundle.getString("verbose")) : false;
         }
         catch (Exception ignore) { }
         if (verbose) err.println("verbose was set true in the properties file.");
@@ -152,7 +155,8 @@ public class Main {
             nonOptArgs.remove(0);
         }
 
-        for (int i=0; i<nonOptArgs.size(); ++i) { // avoid concurrent mod error
+        // loop explicitly to avoid concurrent mod error
+        for (int i=0; i<nonOptArgs.size(); ++i) { 
             String arg=nonOptArgs.get(i);
             if (arg.startsWith("xcc://") || arg.startsWith("xccs://")) {
                 uriStr = arg;
@@ -162,20 +166,22 @@ public class Main {
         }
 
         if (uriStr == null) {
-            String propNameSuffix = nonOptArgs.size() == 0 ? "" : nonOptArgs.get(0);
+            label = nonOptArgs.size() == 0 ? "" : nonOptArgs.get(0);
             String noXCC = "Connection string starting with xcc:// or xccs:// "+
                 "not found in argument list, \n";
 
             //  get resource file xq.properties
-            if (bundle == null) throw new Exception(noXCC+"and I cannot find xq.properties.");
+            if (bundle == null) throw new Exception(
+                noXCC+"and I cannot find xq.properties!");
 
             try {
-                uriStr = bundle.getString(propNameSuffix.length()==0 ?
-                    "uri": "uri."+propNameSuffix);
+                uriStr = bundle.getString(label.length()==0 ?
+                    "uri": "uri."+label);
             }
             catch (Exception ex) {
                 throw new Exception(
-                    noXCC+"and I cannot find property uri."+propNameSuffix+" in xq.properties!");
+                    noXCC+"and I cannot find property uri."+label+
+                    " in xq.properties!");
             }
         }
 
@@ -219,7 +225,7 @@ public class Main {
     }
 
 
-    URISpec parseUrl(String cs) {
+    URISpec parseUri(String cs) {
         Pattern p = Pattern.compile("(xccs?)://([^:]+):(.+)@([^:@]+):(\\d+)");
         Matcher m = p.matcher(cs);
 
@@ -232,6 +238,20 @@ public class Main {
             rs.port = Integer.parseInt(m.group(5));
             return rs;
         }
+
+        p = Pattern.compile("(xccs?)://([^:]+):?@([^@:]+):(\\d+)");
+        m = p.matcher(cs);
+
+        if (m.matches()) {
+            URISpec rs = new URISpec();
+            rs.scheme = m.group(1);
+            rs.user = m.group(2);
+            //  password not given
+            rs.host = m.group(3);
+            rs.port = Integer.parseInt(m.group(4));
+            return rs;
+        }
+
         return null;
     }
 
@@ -240,10 +260,17 @@ public class Main {
         // // //  the main action // // //
 
     void runQuery(String query) throws Exception {
-        URISpec v = parseUrl( uriStr.trim() );
+        URISpec v = parseUri( uriStr.trim() );
+
+        if (v.pass == null) {
+            String passProp = bundle.getString(
+                label.length()==0 ? "pw": "pw."+label);
+            if (passProp != null) v.pass = Occlude_J.reveal(passProp);
+        }
+
         ContentSource cs;
         //  #SSL
-        if (uriStr.startsWith("xccs://")) {
+        if (v.scheme.equals("xccs")) {
             cs = ContentSourceFactory.newContentSource(
                 v.host, v.port, v.user, v.pass, null, 
                 newTrustOptions()
@@ -286,7 +313,6 @@ public class Main {
         processBundle();
         processArgs(args);
         String query = fetchQuery();
-
         runQuery(query);
     }
 
@@ -304,7 +330,8 @@ public class Main {
         }
         catch (Exception ex) {
             out.println("\n---------------------\n" +
-                "CAUGHT EXCEPTION running query against "+stripPassword(m.uriStr));
+                "CAUGHT EXCEPTION running query against "+
+                stripPassword(m.uriStr));
 
             out.println(ex);
             System.exit(-1);

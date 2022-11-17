@@ -17,58 +17,43 @@ import java.security.cert.CertificateException
 
 @Canonical
 class XccConn {
-    static def xqBundle=[:]
-    static {
-        // doesn't work from the command line.  (?!?)
-        //   ResourceBundle.getBundle('xq')
 
-        try {
-            FileInputStream fis=new FileInputStream('xq.properties')
-            xqBundle = new PropertyResourceBundle(fis)
-        }
-        catch (FileNotFoundException ex) {
-            // ignore - user will need to specify conn str
-        }
+    static XqProperties xqp = new XqProperties()
 
-    }
-
-    static String uriStr(String label) {
-        def uriStr = xqBundle.getString('uri' + (label?".$label":'')).trim()
-        if (!uriStr) {
-            println 'uri undefined in properties file.'
-            System.exit(-1)
-        }
-        uriStr
-    }
-
-    static XccConn fromLabel(String label) {
-        XccConn xc = new XccConn(uriStr(label)); xc.label=label
-        return xc
-    }
-
-    def parseUri(cs) {
-        def m=cs =~ /(xccs?):\/\/([^:]+):(.+)@([^@:]+):(\d+)/
-
-        if (m) {
-            def m0=m[0]
-            return [ scheme: m0[1], user: m0[2], pass: m0[3],
-                host: m0[4], port: m0[5] ]
-        }
-        null
-    }
-
-    String uriStr, label=''
     URI uri
+    Map params
     ContentSource cs
     Session session
     RequestOptions reqOptions
     ContentCreateOptions cntOptions
     long elapsed // after calling eachString or firstString, this will be set
 
-    XccConn(String u) {
-        def v = parseUri(uriStr=u)
+    /**
+        Construct from connection string,
+        not using xq.properties.
+        cannot use occluded password
+    */
+    XccConn(String u) { this(xqp.parseUri(u)) }
 
-        if (uriStr.startsWith("xccs://")) {
+    /**
+        Construct from label of property in xq.properties
+        (actually named "uri.$label") which points to a
+        connection string.
+
+        Will use occluded password if it's given in
+        xq.properties as "pw.$label"
+    */
+    static XccConn fromLabel(String label) {
+        return new XccConn(xqp.uriMapFromLabel(label))
+    }
+
+    /**
+        Construct from a map containing
+        scheme, host, user, pass, and port.
+    */
+    XccConn(Map v) {
+        params = v
+        if (v.scheme == 'xccs') {
             cs = ContentSourceFactory.newContentSource(
                 v.host, v.port as int, v.user, v.pass, null,
                 newTrustOptions())
@@ -117,6 +102,9 @@ class XccConn {
     void useJavascript() {
         reqOptions.setQueryLanguage('javascript')
     }
+    void useXQuery() {
+        reqOptions.setQueryLanguage('xquery')
+    }
 
     //  For #SSL connection
     //
@@ -141,8 +129,6 @@ class XccConn {
         return new SecurityOptions(sslContext);
     }
     //
-
-
 
     void eachString(String query, Closure action) {
         Request req = session.newAdhocQuery(query, reqOptions)
