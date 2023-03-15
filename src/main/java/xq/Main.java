@@ -4,7 +4,9 @@ import com.marklogic.xcc.*;
 
 import java.io.*;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import static java.util.stream.Collectors.*;
 import java.nio.charset.Charset;
 import java.util.regex.*;
 
@@ -17,10 +19,13 @@ import javax.net.ssl.SSLContext;
 import com.marklogic.xcc.SecurityOptions;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-//import java.security.KeyManagementException;
 import java.security.cert.X509Certificate;
 import java.security.cert.CertificateException;
 //
+// for KeyStore
+import java.security.KeyStore;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.KeyManager;
 
 
 public class Main {
@@ -39,6 +44,11 @@ public class Main {
 
     String charSet = "utf-8";
 
+    static String envVar(String lbl) { return System.getenv(lbl); }    
+    // keyStore
+    static String ksFilePath = envVar("marklogic_keyStore_filePath");
+    static String ksPassword = envVar("marklogic_keyStore_password");   
+    
     public void usage() {
         try {
             BufferedReader in = new BufferedReader(
@@ -79,8 +89,17 @@ public class Main {
             }
     }
 
-    //  For #SSL connection
-    //
+    /* For #SSL connection
+
+        KEYSTORE 
+
+        While PKCS12 is the supposedly preferred keystore format,
+        converting from JKS using keytool may not work.
+         
+        It doesn't seem to matter which you use in the call to 
+        KeyStore.getInstance(), as apparently it auto-detects.
+
+    */
     protected SecurityOptions newTrustOptions() throws Exception {
         TrustManager[] trust = new TrustManager[] { new X509TrustManager() {
             public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
@@ -94,11 +113,22 @@ public class Main {
             }
 
             public X509Certificate[] getAcceptedIssuers() {
-                return null;
+                return new X509Certificate[0];
             }
         } };
-        SSLContext sslContext = SSLContext.getInstance("SSLv3");
-        sslContext.init(null, trust, null);
+        SSLContext sslContext = SSLContext.getInstance("TLSv1.2"); // was "SSLv3"
+
+        KeyManager[] kms = null;
+        if (ksFilePath != null && !"".equals(ksFilePath)) {
+            // See note above about KEYSTORE
+            KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream(ksFilePath), null);
+
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("PKIX");
+            kmf.init(ks, ksPassword.toCharArray()); 
+            kms = kmf.getKeyManagers();
+        }
+        sslContext.init(kms, trust, null);
         return new SecurityOptions(sslContext);
     }
     //
@@ -130,21 +160,41 @@ public class Main {
         if (verbose) err.println("verbose was set true in the properties file.");
     }
 
+    public static String find(String[] ary, Predicate<String> p) {
+        String rs = null;
+        List<String> found =  Stream.of(ary).filter(p)
+            .collect(toList());
+
+        if (found.size() > 0) rs=found.get(0);    
+        return rs;
+    }    
+
     void processArgs(String[] args) throws Exception {
 
         List<String> nonOptArgs =
             Arrays.stream(args).filter( s-> !s.startsWith("-") )
-            .collect(Collectors.toList());
+            .collect(toList());
 
         List<String> optArgs =
             Arrays.stream(args).filter( s-> s.startsWith("-") )
-            .collect(Collectors.toList());
+            .collect(toList());
 
 
         //  Assign: useJavaScript, uriStr, fileName
 
         if (optArgs.contains("-js")) useJavaScript = true;
         if (optArgs.contains("-stream")) cacheResult = false;
+
+
+        String ksFpArg = find(args, arg-> arg.matches( "-ksFilePath=.+" ));
+
+        if (ksFpArg != null && !ksFpArg.equals("")) {
+            String ksPwArg = find(args, arg-> arg.matches( "-ksPassword=.+" ));
+            ksFilePath = ksFpArg.split("=")[1];
+            ksPassword = ksPwArg == null ? "" : ksPwArg.split("=")[1];
+        }
+
+        // out.println("ksFilePath: "+ksFilePath+"; ksPassword: "+ksPassword);
 
         if (optArgs.contains("-")) fileName="-";
         else {
@@ -202,10 +252,10 @@ public class Main {
         else {
             File f = null;
             for (String ext : extensions) {
-            f = new File(fileName+ext);
-            if (f.exists()) break;
+                f = new File(fileName+ext);
+                if (f.exists()) break;
             }
-            if (!f.exists()) {
+            if (f==null || !f.exists()) {
                 err.println("Cannot find a file named "+f);
                 usage();
             }
@@ -318,7 +368,8 @@ public class Main {
 
     public static String stripPassword(String uri) {
         if (uri == null) return "";
-        return uri.replaceFirst(":[^/]*@",":*****@");
+        return uri.replaceFirst("(xccs?://[^:]+):(.+)@([^:@]+):(\\d+)",
+                "$1:*****@$3");
     }
 
 

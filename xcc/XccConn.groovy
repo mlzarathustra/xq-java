@@ -14,6 +14,10 @@ import javax.net.ssl.X509TrustManager
 import java.security.cert.X509Certificate
 import java.security.cert.CertificateException
 
+import java.security.KeyStore
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.KeyManager
+
 
 @Canonical
 class XccConn {
@@ -33,7 +37,13 @@ class XccConn {
         not using xq.properties.
         cannot use occluded password
     */
-    XccConn(String u) { this(xqp.parseUri(u)) }
+    XccConn(String uri) { this(uri, null, null) }
+
+    /*  ks = keystore 
+     */
+    XccConn(String uri, String ksFilePath, String ksPassword) { 
+        this(xqp.parseUri(uri), ksFilePath, ksPassword) 
+    }
 
     /**
         Construct from label of property in xq.properties
@@ -44,19 +54,39 @@ class XccConn {
         xq.properties as "pw.$label"
     */
     static XccConn fromLabel(String label) {
-        return new XccConn(xqp.uriMapFromLabel(label))
+        return fromLabel(label, null, null)
     }
 
+    /*  ks = keystore 
+     */
+    static XccConn fromLabel(
+        String label, 
+        String ksFilePath, 
+        String ksPassword) {
+
+        return new XccConn(
+            xqp.uriMapFromLabel(label), 
+            ksFilePath, ksPassword
+        )
+    }
+
+
+    
     /**
         Construct from a map containing
         scheme, host, user, pass, and port.
+     */
+    XccConn(Map v) { this(v, null, null) }
+
+    /**  ks = keyStore
     */
-    XccConn(Map v) {
+    XccConn(Map v, String ksFilePath, String ksPassword) {
         params = v
+
         if (v.scheme == 'xccs') {
             cs = ContentSourceFactory.newContentSource(
                 v.host, v.port as int, v.user, v.pass, null,
-                newTrustOptions())
+                newTrustOptions(ksFilePath, ksPassword))
         }
         else {
             cs = ContentSourceFactory.newContentSource(
@@ -107,8 +137,12 @@ class XccConn {
     }
 
     //  For #SSL connection
+    //  ks = keystore (if any)
     //
-    protected SecurityOptions newTrustOptions() throws Exception {
+    protected SecurityOptions newTrustOptions(
+        String ksFilePath, 
+        String ksPassword) throws Exception {
+
         TrustManager[] trust = new TrustManager[] { new X509TrustManager() {
             public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
                 throws CertificateException {
@@ -121,11 +155,26 @@ class XccConn {
             }
 
             public X509Certificate[] getAcceptedIssuers() {
-                return null;
+                return new X509Certificate[0];
             }
         } };
-        SSLContext sslContext = SSLContext.getInstance("SSLv3");
-        sslContext.init(null, trust, null);
+
+        //SSLContext sslContext = SSLContext.getInstance("SSLv3");
+        SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
+        
+        KeyManager[] kms = null
+        if (ksFilePath) {
+            // it seems to work even if the stated keystore type 
+            // is different from the actual type, but you have to 
+            // specify a valid type; JKS is the older format
+            KeyStore ks = KeyStore.getInstance('JKS')
+            ks.load(new FileInputStream(ksFilePath), null)
+
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("PKIX")
+            kmf.init(ks, ksPassword.toCharArray()) 
+            kms = kmf.getKeyManagers()
+        }
+        sslContext.init(kms, trust, null);
         return new SecurityOptions(sslContext);
     }
     //
